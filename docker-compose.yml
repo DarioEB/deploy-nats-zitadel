@@ -1,0 +1,76 @@
+services:
+  stack-demo-zitadel:
+    image: ghcr.io/zitadel/zitadel:v2.54.2
+    restart: always
+    container_name: stack-demo-${STAGE}-zitadel
+    command: 'start-from-init --masterkey "${IDENTITY_MASTERKEY}" --tlsMode disabled'
+    environment:
+      - ZITADEL_DATABASE_POSTGRES_HOST=stack-demo-${STAGE}-zitadel-database
+      - ZITADEL_DATABASE_POSTGRES_DATABASE=zitadel
+      - ZITADEL_DATABASE_POSTGRES_PORT=5432
+      - ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME=zitadeladmin
+      - ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD=${IDENTITY_DATABASE_ADMIN_PASSWORD}
+      - ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE=disable
+      - ZITADEL_DATABASE_POSTGRES_USER_USERNAME=zitadeluser
+      - ZITADEL_DATABASE_POSTGRES_USER_PASSWORD=${IDENTITY_DATABASE_USER_PASSWORD}
+      - ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE=disable
+      - ZITADEL_EXTERNALSECURE=false
+      - ZITADEL_TLS_ENABLED=false
+      - ZITADEL_PORT=80
+      - ZITADEL_EXTERNALPORT=80
+      # - ZITADEL_EXTERNALDOMAIN="localhost"
+    networks:
+      - stack-demo-network-zitadel-database
+      - stack-demo-network-nginx
+    depends_on:
+      - stack-demo-zitadel-database
+
+  stack-demo-zitadel-database:
+    image: postgres:16.3
+    restart: always
+    container_name: stack-demo-${STAGE}-zitadel-database
+    environment:
+      - POSTGRES_USER=zitadeladmin
+      - POSTGRES_PASSWORD=${IDENTITY_DATABASE_ADMIN_PASSWORD}
+      - POSTGRES_DB=zitadel
+    volumes:
+      - stack-demo-volume-zitadel-database:/var/lib/postgresql/data
+    networks:
+      - stack-demo-network-zitadel-database
+
+  stack-demo-nats-server:
+    image: nats:2.10.5-alpine3.18
+    container_name: stack-demo-${STAGE}-nats-server
+    restart: always
+    volumes:
+      - ./nats-server.conf:/etc/nats/nats-server.conf
+      - stack-demo-volume-nats-server:/data/
+    ports:
+      - 4222:4222
+      - 6222:6222
+      - 8222:8222
+
+  stack-demo-nginx:
+    image: nginx:1.27.0
+    restart: always
+    container_name: stack-demo-${STAGE}-nginx
+    volumes:
+      - ./nginx-config.d:/etc/nginx/conf.d:ro
+      - ./resources:/etc/nginx/resources:ro
+    networks:
+      - stack-demo-network-nginx
+    ports:
+      - 80:80
+
+volumes:
+  stack-demo-volume-zitadel-database:
+    name: "stack-demo-${STAGE}-volume-zitadel-database"
+  stack-demo-volume-nats-server:
+    name: "stack-demo-${STAGE}-volume-nats-server"
+
+networks:
+  stack-demo-network-zitadel-database:
+    name: "stack-demo-${STAGE}-network-zitadel-database"
+  stack-demo-network-nginx:
+    name: "stack-demo-network-nginx"
+    # external: true
